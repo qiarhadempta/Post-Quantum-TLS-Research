@@ -1,8 +1,8 @@
 # Post-Quantum TLS 1.3 Performance Analysis
 
-This repository documents an independent research project comparing the 
-performance of post-quantum digital signature algorithms — ML-DSA (lattice-based) 
-and SLH-DSA (hash-based) — against classical RSA in TLS 1.3, under degraded 
+This Github repository documents an personal research project comparing the 
+performance of post-quantum digital signature algorithms such as ML-DSA (lattice-based) 
+and SLH-DSA (hash-based), against classical RSA in TLS 1.3, under degraded 
 network conditions.
 
 ## Research Overview
@@ -10,10 +10,10 @@ network conditions.
 Classical cryptographic systems such as RSA are vulnerable to quantum attacks 
 via Shor's algorithm. NIST has standardized post-quantum alternatives including 
 ML-DSA (FIPS 204) and SLH-DSA (FIPS 205). However, integrating these algorithms 
-into real protocols like TLS 1.3 introduces performance challenges — particularly 
+into real protocols like TLS 1.3 introduces performance challenges, particularly 
 under realistic, degraded network conditions.
 
-This study fills a specific gap: prior work either tested PQC in ideal network 
+This study fills a specific gap, which is prior work either tested PQC in ideal network 
 environments (Delgado, 2026) or simulated certificate sizes using RSA-based chains 
 rather than real PQC implementations (Kampanakis, 2024). This research uses actual 
 ML-DSA and SLH-DSA certificates in live TLS 1.3 handshakes under emulated 

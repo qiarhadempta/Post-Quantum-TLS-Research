@@ -43,12 +43,17 @@ To isolate the operational impact of the digital signature algorithms, the Key E
 * **Sample Size:** 1,000 automated TLS handshakes per condition
 * **Total Dataset size:** **36,000 unique handshakes**
 
+A finer-grained sweep will also be conducted around the threshold where failure rate starts shifting significantly.
+
 ### Metrics & Definitions
 1. **Handshake Duration (ms):** Monitored from `ClientHello` timestamp to the completion of the `Finished` state.
 2. **Handshake Failure Rate (%):** Defined as the percentage of connections per condition that fail to reach the `Finished` state within a **10-second timeout** or terminate prematurely (e.g., connection reset, connection timeout). 
 3. **Certificate Chain Size (bytes):** Total size of transmitted public certificates (acting as the primary regression predictor).
 4. **CPU Cycles:** Measured on the server-side via `perf` / `rdtsc` to account for computational overhead.
-
+5. **TCP Retransmissions**: The number of packets resent per handshake
+6. **Bytes-on-Wire**: the total number of bytes that actually passed through the network
+7. **Packet Count**: the number of packets per handshake
+   
 ## Software Stack
 
 * **OS:** Ubuntu 22.04 LTS (VirtualBox Environment)

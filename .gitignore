@@ -1,2 +1,6 @@
 *.key
 *.srl
+*.pcap
+*.pcapng
+logs/
+scripts/verify_liboqs

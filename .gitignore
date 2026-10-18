@@ -4,3 +4,7 @@
 *.pcapng
 logs/
 scripts/verify_liboqs
+*.pcap
+*.pcapng
+logs/
+scripts/verify_liboqs

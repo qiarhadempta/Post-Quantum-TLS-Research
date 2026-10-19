@@ -182,9 +182,67 @@ All round trips succeed, and the sizes match the FIPS 203/204/205 parameter sets
 ---
 
 ## 5. Build oqs-provider 0.12.0
-<to do, update soon>
+oqs-provider is the OpenSSL provider that exposes liboqs algorithms to OpenSSL. It is built last, against the local OpenSSL (Section 3) and the local liboqs (Section 4). It is not installed into the system; OpenSSL loads it directly from the build folder.
 
----
+### 5.1 Sessional Environment
+```bash
+printf '%s\n' 'export PQC_HOME="$HOME/pqc"' 'export PATH="$PQC_HOME/openssl/bin:$PATH"' 'export OQS_MODULES="$HOME/pqc/src/oqs-provider/_build/lib"' > ~/pqc/env.sh
+source ~/pqc/env.sh
+openssl version
+which openssl
+```
+
+Expected: `OpenSSL 3.4.8` and `/home/chantiqia/pqc/openssl/bin/openssl`. Run `source ~/pqc/env.sh` in every new terminal before doing anything else.
+
+### 5.2 Configure and Build
+```bash
+cd ~/pqc/src/oqs-provider
+cmake -GNinja -S . -B _build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DOPENSSL_ROOT_DIR=$HOME/pqc/openssl \
+  -DOPENSSL_INCLUDE_DIR=$HOME/pqc/openssl/include \
+  -DOPENSSL_CRYPTO_LIBRARY=$HOME/pqc/openssl/lib/libcrypto.so \
+  -Dliboqs_DIR=$HOME/pqc/liboqs/lib/cmake/liboqs
+cmake --build _build -j4
+```
+
+output:
+```text
+-- Found OpenSSL: /home/chantiqia/pqc/openssl/lib/libcrypto.so (found suitable version "3.4.8", minimum required is "3.0")  
+-- liboqs found: Include dir at /home/chantiqia/pqc/liboqs/include;/home/chantiqia/pqc/liboqs/include/oqs (SHARED_LIBRARY)
+-- Building commit 7e9d095 in /home/chantiqia/pqc/src/oqs-provider
+....
+[44/44] Linking C shared module lib/oqsprovider.so
+```
+
+### 5.3 Verification
+```bash
+openssl list -providers -provider-path $OQS_MODULES -provider oqsprovider -provider default
+openssl list -signature-algorithms -provider-path $OQS_MODULES -provider oqsprovider | grep -i -E "mldsa44|slhdsasha2128f"
+openssl list -kem-algorithms -provider-path $OQS_MODULES -provider oqsprovider | grep -i mlkem512
+```
+
+output
+
+```text
+Providers:
+  default
+    name: OpenSSL Default Provider
+    version: 3.4.8
+    status: active
+  oqsprovider
+    name: OpenSSL OQS Provider
+    version: 0.12.0
+    status: active
+  mldsa44 @ oqsprovider
+  p256_mldsa44 @ oqsprovider
+  rsa3072_mldsa44 @ oqsprovider
+  slhdsasha2128f @ oqsprovider
+  mlkem512 @ oqsprovider
+  SecP256r1MLKEM512 @ oqsprovider
+  x25519_mlkem512 @ oqsprovider
+  bp256_mlkem512 @ oqsprovider
+```
 
 ## 6. TLS 1.3 handshake test
 <to do, update soon>

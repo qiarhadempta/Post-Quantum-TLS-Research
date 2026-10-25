@@ -248,4 +248,162 @@ Providers:
 
 
 ## 6. TLS 1.3 handshake test
-<to do, update soon>
+### 6.1 Session
+First, make a session
+
+```bash
+source ~/pqc/env.sh
+openssl version
+mkdir -p ~/pqc/scripts ~/pqc/logs
+```
+
+the output must be showing the openssl version
+```text
+OpenSSL 3.4.8 29 Sep 2026 (Library: OpenSSL 3.4.8 29 Sep 2026)
+```
+
+### Recreate the Certificate
+```bash
+cat > ~/pqc/scripts/gen_certs.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+: "${OQS_MODULES:?run first: source ~/pqc/env.sh}"
+case "$(openssl version)" in
+  *3.4.8*) ;;
+  *) echo "wrong openssl: $(command -v openssl)"; exit 1 ;;
+esac
+PROV="-provider-path $OQS_MODULES -provider oqsprovider -provider default"
+OUT="$HOME/pqc/certs"
+mkdir -p "$OUT" && cd "$OUT"
+
+printf '%s\n' '[req]' 'distinguished_name=dn' '[dn]' > minimal.cnf
+printf '%s\n' 'basicConstraints=critical,CA:FALSE' 'keyUsage=critical,digitalSignature' 'extendedKeyUsage=serverAuth' 'subjectAltName=DNS:localhost,IP:127.0.0.1' > ext_server.cnf
+
+gen() {
+  local dir=$1 alg=$2
+  mkdir -p "$dir"
+  (
+    cd "$dir"
+    openssl req -x509 -new -newkey "$alg" -noenc -keyout root.key -out root.crt -days 365 \
+      -subj "/O=PQC TLS Research/CN=PQC Research Root CA" -config ../minimal.cnf \
+      -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" $PROV
+    openssl req -new -newkey "$alg" -noenc -keyout server.key -out server.csr \
+      -subj "/O=PQC TLS Research/CN=localhost" -config ../minimal.cnf $PROV
+    openssl x509 -req -in server.csr -CA root.crt -CAkey root.key -CAcreateserial \
+      -out server.crt -days 365 -extfile ../ext_server.cnf $PROV
+    rm -f server.csr
+    for f in root server; do
+      printf '%s/%s.crt  DER=%s bytes\n' "$dir" "$f" "$(openssl x509 -in $f.crt -outform DER $PROV | wc -c)"
+    done
+  )
+}
+gen A mldsa44
+gen B slhdsasha2128f
+gen C rsa:2048
+EOF
+bash ~/pqc/scripts/gen_certs.sh
+```
+
+output:
+```text
+Certificate request self-signature ok
+subject=O=PQC TLS Research, CN=localhost
+A/root.crt  DER=4040 bytes
+A/server.crt  DER=4110 bytes
+-----
+-----
+Certificate request self-signature ok
+subject=O=PQC TLS Research, CN=localhost
+B/root.crt  DER=17424 bytes
+B/server.crt  DER=17494 bytes
+...+...+............+.......+......+++++++++++++++++++++++++++++++++++++++*.+...+.....+.........+++++++++++++++++++++++++++++++++++++++*......+..........+..+.......+...+.........+.....+.+...+..+..........+.....+............+.+.........+.....+.......+...+..+.+...............+..+.............+..+.............+..................+..+....++++++
+.+.....+...+.+........+...+....+...+...+++++++++++++++++++++++++++++++++++++++*....+.+..+............+......+...+.+.........+.........+...+...+.....+......+......+...+....+...+..+............+................+.....+.........+..........+......+..+.+..+...+.+........+.......+.....+.+...+......+...+..+...+...+...+.+++++++++++++++++++++++++++++++++++++++*..+...+.+........+.+...........+.+..+......+.+......+...............+.....+...+.........+.+.........+..+...+...+..........+..+.......+.....+...+................+..+...+.+...+..+...+.....................+.......+..+.+...............+.....+....+......+......+.......................+......+.+...+...+.....+...............+.......+..+.+.........+...+......+......+........+...+....+...+............+.........+...........+...+...+.......+...........+....+...+...+.........+..+................+..+............+.+.........+......+...+..+.........+...+...+..........+...+..+.......+...+..+...+....+........+.+............+..............+....++++++
+-----
+.........+......+......+++++++++++++++++++++++++++++++++++++++*.........+..........+++++++++++++++++++++++++++++++++++++++*......+......................+.........+.........+..+.......+..+....+..+.......+..+...+......+....+.....+.+..+...+......................+.....+...+............+.............+.....+.........+...+............+.......+........+......++++++
+......+.+............+..+++++++++++++++++++++++++++++++++++++++*....+++++++++++++++++++++++++++++++++++++++*..+.+........+......+..........+..++++++
+-----
+Certificate request self-signature ok
+subject=O=PQC TLS Research, CN=localhost
+C/root.crt  DER=840 bytes
+C/server.crt  DER=910 bytes
+```
+
+<img width="1842" height="810" alt="image" src="https://github.com/user-attachments/assets/9962718b-6d5d-43fc-9948-f6692e61a22e" />
+
+
+### Handshake Test
+```bash
+cat > ~/pqc/scripts/handshake_test.sh <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+: "${OQS_MODULES:?run first: source ~/pqc/env.sh}"
+PROV="-provider-path $OQS_MODULES -provider oqsprovider -provider default"
+DIR="$HOME/pqc/certs"
+mkdir -p "$HOME/pqc/logs"
+
+run() {
+  local name=$1 dir=$2 group=$3 sig=$4 port=$5
+  echo "=== Scenario $name: group=$group sigalg=$sig ==="
+  openssl s_server -accept "$port" -tls1_3 -cert "$DIR/$dir/server.crt" -key "$DIR/$dir/server.key" \
+    -groups "$group" -sigalgs "$sig" -quiet $PROV > "$HOME/pqc/logs/server_$name.log" 2>&1 &
+  local pid=$!
+  sleep 2
+  openssl s_client -connect "localhost:$port" -tls1_3 -groups "$group" -sigalgs "$sig" \
+    -CAfile "$DIR/$dir/root.crt" -verify_return_error -brief $PROV < /dev/null 2>&1
+  echo "(s_client exit code: $?)"
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  echo
+}
+
+run A A mlkem512 mldsa44 4433
+run B B mlkem512 slhdsasha2128f 4434
+run C C X25519 rsa_pss_rsae_sha256 4435
+EOF
+tail -3 ~/pqc/scripts/handshake_test.sh
+bash ~/pqc/scripts/handshake_test.sh
+```
+
+output:
+```text
+=== Scenario A: group=mlkem512 sigalg=mldsa44 ===
+Connecting to 127.0.0.1
+Can't use SSL_get_servername
+CONNECTION ESTABLISHED
+Protocol version: TLSv1.3
+Ciphersuite: TLS_AES_256_GCM_SHA384
+Peer certificate: O=PQC TLS Research, CN=localhost
+Hash used: UNDEF
+Signature type: mldsa44
+Verification: OK
+DONE
+(s_client exit code: 0)
+
+=== Scenario B: group=mlkem512 sigalg=slhdsasha2128f ===
+Connecting to 127.0.0.1
+Can't use SSL_get_servername
+CONNECTION ESTABLISHED
+Protocol version: TLSv1.3
+Ciphersuite: TLS_AES_256_GCM_SHA384
+Peer certificate: O=PQC TLS Research, CN=localhost
+Hash used: UNDEF
+Signature type: slhdsasha2128f
+Verification: OK
+(s_client exit code: 0)
+
+=== Scenario C: group=X25519 sigalg=rsa_pss_rsae_sha256 ===
+Connecting to 127.0.0.1
+Can't use SSL_get_servername
+CONNECTION ESTABLISHED
+Protocol version: TLSv1.3
+Ciphersuite: TLS_AES_256_GCM_SHA384
+Peer certificate: O=PQC TLS Research, CN=localhost
+Hash used: SHA256
+Signature type: RSA-PSS
+Verification: OK
+Server Temp Key: X25519, 253 bits
+DONE
+(s_client exit code: 0)
+```
+
+<img width="695" height="855" alt="image" src="https://github.com/user-attachments/assets/d915a1e2-6d71-4c0a-90c9-004953072f0d" />
+

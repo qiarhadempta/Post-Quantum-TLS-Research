@@ -244,5 +244,8 @@ Providers:
   bp256_mlkem512 @ oqsprovider
 ```
 
+<img width="1234" height="539" alt="image" src="https://github.com/user-attachments/assets/e05ed07e-8b06-4c82-b93f-34a46871f211" />
+
+
 ## 6. TLS 1.3 handshake test
 <to do, update soon>

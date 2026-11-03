@@ -407,3 +407,27 @@ DONE
 
 <img width="695" height="855" alt="image" src="https://github.com/user-attachments/assets/d915a1e2-6d71-4c0a-90c9-004953072f0d" />
 
+### 6.2 Confirming the key-exchange group (ML-KEM-512)
+
+A successful handshake alone does not show which key-exchange group was used, because `s_client -brief` does not print it. It was confirmed separately with three observations, using [`scripts/kem_check.sh`](../scripts/kem_check.sh):
+
+| Observation | Result | Interpretation |
+|---|---|---|
+| `NamedGroup` in the ClientHello `key_share` | `UNKNOWN (512)` | Codepoint 512 is `mlkem512` in oqs-provider's `ALGORITHMS.md`; OpenSSL has no built-in name for provider-defined groups |
+| Client `key_share` extension length | 806 bytes | 800-byte ML-KEM-512 public key + 6 bytes of framing |
+| Server `key_share` extension length | 772 bytes | 768-byte ML-KEM-512 ciphertext + 4 bytes of framing |
+| Client restricted to `X25519` against a server restricted to `mlkem512` | Handshake fails, alert 40 (`handshake failure`) | The `-groups` restriction is enforced |
+
+### 6.3 Repeatability on loopback
+
+[`scripts/repeat_test.sh`](../scripts/repeat_test.sh) repeats each scenario 20 times:
+
+```text
+Scenario A: exit0=20/20  DONE=16/20
+Scenario B: exit0=20/20  DONE=7/20
+Scenario C: exit0=20/20  DONE=16/20
+```
+
+<img width="387" height="96" alt="image" src="https://github.com/user-attachments/assets/9566a1d8-f577-43cf-b396-2b4bffdf94d9" />
+
+All 60 handshakes succeed. The `DONE` line printed by `s_client -brief` is **not** a reliable success indicator: it is printed inconsistently (least often in Scenario B). Success must be judged by the process exit code. Because `s_client` with `</dev/null` is also timing-sensitive, the measurement campaign will use a purpose-built client that times `SSL_connect` directly.

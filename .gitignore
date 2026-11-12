@@ -8,3 +8,6 @@ scripts/verify_liboqs
 *.pcapng
 logs/
 scripts/verify_liboqs
+*.key
+*.pem
+tlsbench

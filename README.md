@@ -124,9 +124,10 @@ OpenSSL 3.4.8 was chosen because the system OpenSSL (3.0.13) lacks the provider 
 
 ```text
 Post-Quantum-TLS-Research/
-├── certs/      # Public certificates only (.crt); private keys are never committed
-├── docs/       # setup-log.md (environment), experimental-design.md (design and analysis plan)
-├── scripts/    # certificate generation, network namespace setup, packet capture,
-│               # measurement client, benchmark wrappers and analysis scripts
+├── certs/                 # Public certificates only (.crt); private keys are never committed
+├── docs/                  # setup-log.md (environment)
+├── scripts/               # certificate generation, network namespace setup, packet capture,
+│                          # measurement client, benchmark wrappers and analysis scripts
+├── Experimental_Design.md # design and analysis plan
 └── README.md
 ```
